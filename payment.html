@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Form Deposit QRIS</title>
+  <style>
+    :root {
+      --bg1: #0f172a;
+      --bg2: #1e293b;
+      --card: rgba(255,255,255,0.12);
+      --accent: #38bdf8;
+      --muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+
+    body {
+      margin: 0;
+      padding: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(145deg, var(--bg1), var(--bg2));
+      color: #e2e8f0;
+    }
+
+    .card {
+      width: 360px;
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(12px) saturate(180%);
+      box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 10px;
+      text-align: center;
+      color: #fff;
+    }
+
+    p.lead {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+
+    input[type="number"],
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      font-size: 14px;
+      background: rgba(255,255,255,0.05);
+      color: #f1f5f9;
+      outline: none;
+      transition: border 0.2s ease, background 0.2s ease;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 0;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.25s ease;
+    }
+
+    .btn-grey {
+      background: rgba(255,255,255,0.08);
+      color: #e2e8f0;
+    }
+
+    .btn-grey:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0f172a;
+    }
+
+    .btn-primary:hover {
+      background: #7dd3fc;
+    }
+
+    /* overlay spinner */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15,23,42,0.75);
+      z-index: 9999;
+      backdrop-filter: blur(6px);
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .spinner {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      background: rgba(255,255,255,0.1);
+      box-shadow: 0 6px 22px rgba(2,6,23,0.25);
+    }
+
+    .ring {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 5px solid rgba(255,255,255,0.15);
+      border-top-color: var(--accent);
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .overlay p {
+      color: white;
+      margin-top: 10px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .foot {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="card" id="container" role="main">
+    <h1>Form Deposit — QRIS</h1>
+    <p class="lead">Masukkan username dan nominal deposit, lalu tekan <strong>Konfirmasi</strong> untuk generate QR.</p>
+
+    <form id="depositForm">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" placeholder="e.g. johndoe123" required />
+
+      <label for="amount">Nominal (Rp)</label>
+      <input id="amount" name="amount" type="number" inputmode="numeric" min="50000" step="1" placeholder="e.g. 50000" required />
+
+      <div class="row">
+        <button type="button" id="backBtn" class="btn btn-grey">Kembali</button>
+        <button type="submit" id="confirmBtn" class="btn btn-primary">Konfirmasi</button>
+      </div>
+
+      <p class="foot">Deposit wajib menggunakan akun aktif. Transaksi pertama wajib pakai kode unik, contoh: <strong>50.888</strong></p>
+    </form>
+  </main>
+
+  <div id="overlay" class="overlay">
+    <div style="text-align:center">
+      <div class="spinner"><div class="ring"></div></div>
+      <p id="overlayText">Memproses…</p>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('depositForm');
+    const overlay = document.getElementById('overlay');
+    const overlayText = document.getElementById('overlayText');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const backBtn = document.getElementById('backBtn');
+    const amountInput = document.getElementById('amount');
+    const usernameInput = document.getElementById('username');
+    const container = document.getElementById('container');
+
+    backBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      history.back();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nominal = Number(amountInput.value);
+      const username = usernameInput.value.trim();
+
+      if (!username) {
+        usernameInput.setCustomValidity('Masukkan username kamu.');
+        usernameInput.reportValidity();
+        return;
+      }
+
+      if (!nominal || nominal < 50000) {
+        amountInput.setCustomValidity('Masukkan nominal minimal 50.000');
+        amountInput.reportValidity();
+        return;
+      }
+
+      overlay.classList.add('show');
+      overlayText.textContent = 'Menghubungkan ke server QRIS...';
+      confirmBtn.disabled = true;
+      backBtn.disabled = true;
+      amountInput.disabled = true;
+      usernameInput.disabled = true;
+
+      try {
+        const resp = await fetch("https://rest.otomatis.vip/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: username,
+            amount: nominal,
+            uuid: "ef11197b-1503-4e70-b76d-5406fe6079e9",
+            expire: 1200,
+            custom_ref: "887"
+          })
+        });
+
+        const data = await resp.json();
+        overlay.classList.remove('show');
+
+        if (data.data) {
+          const qr_url = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(data.data)}&size=250x250`;
+
+          // 🔔 Kirim notifikasi Telegram
+          const message = `💰 Deposit QRIS Dibuat\n👤 Username: ${username}\n💵 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n🕒 Waktu: ${new Date().toLocaleString('id-ID')}`;
+          try {
+            await fetch(`https://deposit.yutupprem0.workers.dev/?message=${encodeURIComponent(message)}`);
+          } catch (err) {
+            console.error("Gagal kirim notifikasi Telegram:", err);
+          }
+
+          container.innerHTML = `
+            <div class="card" style="text-align:center; color:#e2e8f0;">
+              <h1>DEPOSIT QRIS</h1>
+              <img src="${qr_url}" alt="QR Code" style="margin:15px auto;max-width:250px;border-radius:10px;">
+              <p>
+                Untuk: <span style="color:#38bdf8">${username}</span><br>
+                Jumlah: <span style="color:#38bdf8">Rp ${nominal.toLocaleString('id-ID')}</span>
+              </p>
+              <div class="row" style="margin-top:15px">
+                <button class="btn btn-grey" onclick="window.open('${qr_url}')">Download QR</button>
+                <button class="btn btn-primary" onclick="location.reload()">Buat Lagi</button>
+              </div>
+            </div>
+          `;
+        } else {
+          throw new Error('Gagal membuat QRIS, coba lagi nanti.');
+        }
+      } catch (err) {
+        overlay.classList.remove('show');
+        alert('Terjadi kesalahan: ' + err.message);
+        confirmBtn.disabled = false;
+        backBtn.disabled = false;
+        amountInput.disabled = false;
+        usernameInput.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
